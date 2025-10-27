@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "caiolucasbittencourt-app",
-    "slug": "caiolucasbittencourt-app",
+    "name": "PomoFocus",
+    "slug": "pomofocus",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "caiolucasbittencourtapp",
+    "scheme": "pomofocus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
