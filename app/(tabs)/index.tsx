@@ -1,98 +1,162 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  StyleSheet,
+  Text,
+  Vibration,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { CycleDots } from "../../components/pomodoro/CycleDots";
+import { TimerCircle } from "../../components/pomodoro/TimerCircle";
+import { TimerControls } from "../../components/pomodoro/TimerControls";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const initialTimes = { focus: 25 * 60, shortBreak: 5 * 60, longBreak: 15 * 60 };
+type Mode = "focus" | "shortBreak" | "longBreak";
 
-export default function HomeScreen() {
+const modesConfig = {
+  focus: { label: "Focus Time", time: initialTimes.focus },
+  shortBreak: { label: "Short Break", time: initialTimes.shortBreak },
+  longBreak: { label: "Long Break", time: initialTimes.longBreak },
+};
+
+const { width } = Dimensions.get("window");
+const CIRCLE_SIZE = width * 0.7;
+const STROKE_WIDTH = 10;
+const RADIUS = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+export default function PomodoroApp() {
+  const [currentMode, setCurrentMode] = useState<Mode>("focus");
+  const [timeRemaining, setTimeRemaining] = useState(modesConfig.focus.time);
+  const [isActive, setIsActive] = useState(false);
+  const [round, setRound] = useState(1);
+
+  const intervalRef = useRef<number | null>(null);
+  const animatedProgress = useRef(new Animated.Value(0)).current;
+  const animatedColor = useRef(new Animated.Value(0)).current;
+
+  const toggleTimer = () => setIsActive((prev) => !prev);
+
+  const changeMode = (newMode: Mode) => {
+    setCurrentMode(newMode);
+    setTimeRemaining(modesConfig[newMode].time);
+    animatedProgress.setValue(0);
+  };
+
+  const skipToNext = () => {
+    setIsActive(false);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    if (currentMode === "focus") {
+      const nextRound = round + 1;
+      if (nextRound > 4) {
+        changeMode("longBreak");
+        setRound(1);
+      } else {
+        changeMode("shortBreak");
+        setRound(nextRound);
+      }
+    } else {
+      changeMode("focus");
+    }
+  };
+
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = time % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+      2,
+      "0"
+    )}`;
+  };
+
+  useEffect(() => {
+    if (isActive && timeRemaining > 0) {
+      intervalRef.current = setInterval(() => {
+        setTimeRemaining((prevTime) => prevTime - 1);
+      }, 1000);
+    } else if (timeRemaining === 0) {
+      Vibration.vibrate([500, 500]);
+      setIsActive(false);
+      skipToNext();
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isActive, timeRemaining]);
+
+  useEffect(() => {
+    const totalTime = modesConfig[currentMode].time;
+    const progressValue =
+      totalTime === 0 ? 0 : (totalTime - timeRemaining) / totalTime;
+    Animated.timing(animatedProgress, {
+      toValue: progressValue,
+      duration: 1000,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, [timeRemaining, currentMode]);
+
+  useEffect(() => {
+    Animated.timing(animatedColor, {
+      toValue: ["focus", "shortBreak", "longBreak"].indexOf(currentMode),
+      duration: 500,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, [currentMode]);
+
+  const backgroundColor = animatedColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: ["#D95550", "#4C9195", "#437EA8"],
+  });
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
-
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <Animated.View style={[styles.outerContainer, { backgroundColor }]}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <TimerCircle
+            timeRemaining={timeRemaining}
+            animatedProgress={animatedProgress}
+            circleSize={CIRCLE_SIZE}
+            strokeWidth={STROKE_WIDTH}
+            radius={RADIUS}
+            circumference={CIRCUMFERENCE}
+            formatTime={formatTime}
+          />
+          <TimerControls
+            isActive={isActive}
+            onToggle={toggleTimer}
+            onSkip={skipToNext}
+          />
+          <CycleDots round={round} currentMode={currentMode} />
+          <Text style={styles.modeLabel}>{modesConfig[currentMode].label}</Text>
+        </View>
+      </SafeAreaView>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  outerContainer: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  container: {
+    flex: 1,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  content: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modeLabel: {
+    fontSize: 22,
+    color: "#fff",
+    fontWeight: "500",
   },
 });
